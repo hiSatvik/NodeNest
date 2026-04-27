@@ -1,15 +1,15 @@
 import os
-from typing import Any, Dict
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from pymongo import MongoClient
+from pydantic import BaseModel
+from typing import Dict, Any
+from bson import ObjectId
+from bson.errors import InvalidId
+from fastapi import HTTPException
 
-# 1. Initialize our lovely app!
 app = FastAPI()
 
-# 2. Add CORS so your React app can talk to Python safely
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], 
@@ -33,5 +33,21 @@ def save_tree(data: TreeData):
 
 @app.get("/api/trees")
 def get_trees():
-    trees = list(collection.find({}, {"_id": 0}))
+    trees = []
+    for doc in collection.find():
+        doc_id = str(doc.pop("_id")) 
+        trees.append({"id": doc_id, "tree": doc})
     return {"trees": trees}
+
+@app.put("/api/tree/{tree_id}")
+def update_tree(tree_id: str, data: TreeData):
+    try:
+        object_id = ObjectId(tree_id)
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Invalid tree id")
+
+    result = collection.replace_one({"_id": object_id}, data.tree)
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Tree not found")
+
+    return {"message": "Tree updated successfully!", "id": tree_id}
