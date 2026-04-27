@@ -1,0 +1,43 @@
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: aimonk_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+  backend:
+    build: 
+      context: ./backend
+    container_name: aimonk_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URL=mongodb://admin:admin@mongodb:27017/?authSource=admin
+      - PORT=8000
+    depends_on:
+      - mongodb
+    volumes:
+      - ./backend:/app # For live reloading during development
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: 
+      context: ./frontend
+    container_name: aimonk_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevents overwriting node_modules
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  mongodb_data:
